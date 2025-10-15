@@ -11,10 +11,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import edu.gt.miumg.fabrica.MateriaPrima;
-import edu.gt.miumg.fabrica.ProcesoProduccion;
 import edu.gt.miumg.fabrica.api.dto.DecisionReq;
 import edu.gt.miumg.fabrica.api.dto.EstadoRes;
 import edu.gt.miumg.fabrica.api.dto.MateriaPrimaReq;
+import edu.gt.miumg.fabrica.persistencia.Proceso;
 import edu.gt.miumg.fabrica.servicio.ProcesoManager;
 
 @RestController
@@ -39,8 +39,13 @@ public class ProcesoController {
 
     @GetMapping("/{id}/estado")
     public EstadoRes estado(@PathVariable String id) {
-        ProcesoProduccion p = manager.getProceso(id);
-        return new EstadoRes(p.estadoActual(), p.getMateriaPrima() == null ? null : p.getMateriaPrima().toString(), p.esTerminal());
+        Proceso e = manager.getProcesoEntity(id);
+        String mp = (e.getMpTipo() == null) ? null
+                : "%s (%s, %s%%) x%s".formatted(
+                        e.getMpTipo(), e.getMpCalidad(),
+                        e.getMpHumedad() == null ? "?" : e.getMpHumedad().intValue(),
+                        e.getMpCantidad() == null ? "?" : e.getMpCantidad());
+        return new EstadoRes(e.getEstadoActual(), mp, e.isTerminal());
     }
 
     @GetMapping("/{id}/historial")
@@ -50,21 +55,23 @@ public class ProcesoController {
 
     @PostMapping("/{id}/mp")
     public ResponseEntity<Void> setMateriaPrima(@PathVariable String id, @RequestBody MateriaPrimaReq body) {
-        manager.setMateriaPrima(id,
-                new MateriaPrima(body.tipo(), body.calidad(), body.humedadPorc(), body.cantidad()));
+        manager.setMateriaPrima(id, new MateriaPrima(body.tipo(), body.calidad(), body.humedadPorc(), body.cantidad()));
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/decision")
     public ResponseEntity<Void> decidir(@PathVariable String id, @RequestBody DecisionReq req) {
-        manager.setDecision(id, req.decision());
+        boolean apta = "APTA".equalsIgnoreCase(req.decision())
+                || "SI".equalsIgnoreCase(req.decision())
+                || "TRUE".equalsIgnoreCase(req.decision());
+        manager.decidirCalidad(id, apta);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/avanzar")
     public String avanzar(@PathVariable String id) {
         manager.avanzar(id);
-        return manager.getProceso(id).estadoActual();
+        return manager.getProcesoEntity(id).getEstadoActual(); 
     }
 
     @PostMapping("/{id}/reiniciar")

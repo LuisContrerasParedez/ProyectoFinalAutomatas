@@ -2,7 +2,7 @@ import { Button, VStack, HStack, Text, Box } from "@chakra-ui/react";
 
 export function ProcessList({
   ids, idSel, onSelect, onCreate,
-}: { ids: string[]; idSel: string | null; onSelect: (id: string)=>void; onCreate: ()=>void }) {
+}: { ids: string[]; idSel: string | null; onSelect: (id: string) => void; onCreate: () => void }) {
   return (
     <VStack align="stretch" spacing={2}>
       <HStack justify="space-between">
@@ -10,21 +10,24 @@ export function ProcessList({
         <Button size="sm" colorScheme="teal" onClick={onCreate}>Nuevo</Button>
       </HStack>
       {ids.map(id => (
-        <Box key={id}
+        <Box
+          key={id}
           p={2}
-          rounded="md"
+          rounded="full"
           borderWidth="1px"
-          bg={idSel === id ? "teal.500" : "gray.700"}
-          color={idSel === id ? "white" : "gray.100"}
+          borderColor={idSel === id ? "accent.500" : "gray.200"}
+          bg={idSel === id ? "accent.500" : "white"}
+          color={idSel === id ? "white" : "gray.800"}
           cursor="pointer"
-          onClick={()=>onSelect(id)}
+          onClick={() => onSelect(id)}
           fontFamily="mono"
           fontSize="xs"
-        >
-          {id}
+          >
+          { id }
         </Box>
-      ))}
-      {!ids.length && <Text fontSize="sm" color="gray.400">No hay procesos</Text>}
-    </VStack>
+  ))
+}
+{ !ids.length && <Text fontSize="sm" color="gray.400">No hay procesos</Text> }
+    </VStack >
   );
 }
