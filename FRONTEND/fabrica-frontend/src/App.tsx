@@ -15,6 +15,8 @@ import { useProceso } from "./store/useProceso";
 import { ProcessList } from "./components/ProcessList";
 import { MateriaPrimaForm } from "./components/MateriaPrimaForm";
 import { DecisionSegment } from "./components/DecisionSegment";
+import { ProcessGraph } from "./components/ProcessGraph";
+import { ProcessTimeline } from "./components/ProcessTimeline";
 
 export default function App() {
   const toast = useToast();
@@ -22,18 +24,12 @@ export default function App() {
 
   const esInspeccion = estado?.estadoActual?.toUpperCase().includes("INSPECCION");
   const esTerminal = !!estado?.terminal;
+  const puedeReprocesar = !!idSel && esInspeccion && !esTerminal;
 
   return (
     <Grid templateColumns="320px 1fr" gap={6} p={6} bg="white">
-      {/* Sidebar */}
       <GridItem>
-        <Box
-          bg="white"
-          borderWidth="1px"
-          borderColor="gray.200"
-          rounded="2xl"
-          p={5}
-        >
+        <Box bg="white" borderWidth="1px" borderColor="gray.200" rounded="2xl" p={5}>
           <Heading size="md" mb={4}>
             Procesos
           </Heading>
@@ -49,32 +45,21 @@ export default function App() {
         </Box>
       </GridItem>
 
-      {/* Main */}
       <GridItem>
         <VStack align="stretch" spacing={6}>
-          {/* Proceso actual */}
-          <Box
-            p={5}
-            rounded="2xl"
-            bg="white"
-            borderWidth="1px"
-            borderColor="gray.200"
-          >
+          <Box p={5} rounded="2xl" bg="white" borderWidth="1px" borderColor="gray.200">
             <HStack justify="space-between" mb={2}>
               <Heading size="md">Proceso actual</Heading>
               {loading && <Spinner size="sm" />}
             </HStack>
-
             <Text mt={1} fontWeight="semibold" fontSize="lg">
               {estado?.estadoActual ?? "—"}
             </Text>
-
             {estado?.materiaPrima && (
               <Text mt={1} fontSize="sm" color="gray.600">
                 {estado.materiaPrima}
               </Text>
             )}
-
             {esTerminal && (
               <>
                 <Divider my={3} />
@@ -85,14 +70,9 @@ export default function App() {
             )}
           </Box>
 
-          {/* Operaciones */}
-          <Box
-            p={5}
-            rounded="2xl"
-            bg="white"
-            borderWidth="1px"
-            borderColor="gray.200"
-          >
+          <ProcessGraph actual={estado?.estadoActual} />
+
+          <Box p={5} rounded="2xl" bg="white" borderWidth="1px" borderColor="gray.200">
             <Heading size="sm" mb={3}>
               Operaciones
             </Heading>
@@ -103,14 +83,10 @@ export default function App() {
                     await actions.avanzar();
                     toast({ status: "success", title: "Avanzó" });
                   } catch (e: any) {
-                    toast({
-                      status: "error",
-                      title: "No se pudo avanzar",
-                      description: e.message,
-                    });
+                    toast({ status: "error", title: "No se pudo avanzar", description: e.message });
                   }
                 }}
-                isDisabled={!idSel || esTerminal}
+                isDisabled={!idSel || esTerminal || esInspeccion}
               >
                 Avanzar
               </Button>
@@ -130,31 +106,32 @@ export default function App() {
                 onPick={async (d) => {
                   try {
                     await actions.decidir(d);
-                    toast({
-                      status: "success",
-                      title: `Decisión: ${d}`,
-                    });
+                    toast({ status: "success", title: `Decisión: ${d}` });
                   } catch (e: any) {
-                    toast({
-                      status: "error",
-                      title: "Error al decidir",
-                      description: e.message,
-                    });
+                    toast({ status: "error", title: "Error al decidir", description: e.message });
                   }
                 }}
                 disabled={!idSel || !esInspeccion || esTerminal}
               />
+
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await actions.reproceso();
+                    toast({ status: "success", title: "Enviado a Reproceso" });
+                  } catch (e: any) {
+                    toast({ status: "error", title: "No se pudo reprocesar", description: e.message });
+                  }
+                }}
+                isDisabled={!puedeReprocesar}
+              >
+                Reproceso
+              </Button>
             </HStack>
           </Box>
 
-          {/* Materia Prima */}
-          <Box
-            p={5}
-            rounded="2xl"
-            bg="white"
-            borderWidth="1px"
-            borderColor="gray.200"
-          >
+          <Box p={5} rounded="2xl" bg="white" borderWidth="1px" borderColor="gray.200">
             <Heading size="sm" mb={3}>
               Materia Prima
             </Heading>
@@ -167,32 +144,7 @@ export default function App() {
             />
           </Box>
 
-          {/* Historial */}
-          <Box
-            p={5}
-            rounded="2xl"
-            bg="white"
-            borderWidth="1px"
-            borderColor="gray.200"
-            maxH="340px"
-            overflowY="auto"
-          >
-            <Heading size="sm" mb={3}>
-              Historial
-            </Heading>
-            <VStack align="stretch" spacing={1}>
-              {historial.map((line, i) => (
-                <Text key={i} fontFamily="mono" fontSize="sm" color="gray.800">
-                  {line}
-                </Text>
-              ))}
-              {!historial.length && (
-                <Text color="gray.500" fontSize="sm">
-                  Sin eventos
-                </Text>
-              )}
-            </VStack>
-          </Box>
+          <ProcessTimeline items={historial} />
         </VStack>
       </GridItem>
     </Grid>

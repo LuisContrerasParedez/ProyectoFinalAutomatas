@@ -34,7 +34,7 @@ export function useProceso() {
 
   async function crear() {
     const nuevo = await procesosApi.crear();
-    setIds(prev => [nuevo, ...prev]);
+    setIds((prev) => [nuevo, ...prev]);
     setIdSel(nuevo);
     await refresh(nuevo);
   }
@@ -63,13 +63,22 @@ export function useProceso() {
     await refresh();
   }
 
+  async function reproceso() {
+    if (!idSel) return;
+    await procesosApi.reproceso(idSel);
+    await refresh();
+  }
+
   useEffect(() => { cargarProcesos(); }, []);
   useEffect(() => { if (idSel) refresh(idSel); }, [idSel]);
 
   return {
-    ids, idSel, setIdSel,
-    estado, historial,
+    ids,
+    idSel,
+    setIdSel,
+    estado,
+    historial,
     loading,
-    actions: { crear, setMp, decidir, avanzar, reiniciar, refresh }
+    actions: { crear, setMp, decidir, avanzar, reiniciar, reproceso, refresh },
   };
 }

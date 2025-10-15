@@ -7,9 +7,10 @@ export function ProcessList({
     <VStack align="stretch" spacing={2}>
       <HStack justify="space-between">
         <Text fontWeight="bold">Procesos</Text>
-        <Button size="sm" colorScheme="teal" onClick={onCreate}>Nuevo</Button>
+        <Button size="sm" onClick={onCreate}>Nuevo</Button>
       </HStack>
-      {ids.map(id => (
+
+      {ids.map((id) => (
         <Box
           key={id}
           p={2}
@@ -22,12 +23,12 @@ export function ProcessList({
           onClick={() => onSelect(id)}
           fontFamily="mono"
           fontSize="xs"
-          >
-          { id }
+        >
+          {id}
         </Box>
-  ))
-}
-{ !ids.length && <Text fontSize="sm" color="gray.400">No hay procesos</Text> }
-    </VStack >
+      ))}
+
+      {!ids.length && <Text fontSize="sm" color="gray.400">No hay procesos</Text>}
+    </VStack>
   );
 }

@@ -2,7 +2,9 @@ package edu.gt.miumg.fabrica.api;
 
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -78,5 +80,21 @@ public class ProcesoController {
     public ResponseEntity<Void> reiniciar(@PathVariable String id) {
         manager.reiniciar(id);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/reproceso")
+    public ResponseEntity<Void> reprocesar(@PathVariable String id) {
+        manager.reprocesar(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<String> onIllegalState(IllegalStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> onIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
     }
 }

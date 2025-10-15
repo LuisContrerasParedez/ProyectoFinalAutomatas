@@ -1,4 +1,4 @@
-import { Button, VStack, HStack, NumberInput, NumberInputField, Select, FormControl, FormLabel } from "@chakra-ui/react"
+import { Button, VStack, HStack, NumberInput, NumberInputField, Select, FormControl, FormLabel } from "@chakra-ui/react";
 import { useState } from "react";
 import type { MateriaPrimaReq, Tipo, Calidad } from "../lib/api";
 
@@ -13,18 +13,41 @@ export function MateriaPrimaForm({ onSave, isDisabled }: {
   const [humedadPorc, setHumedad] = useState(8);
   const [cantidad, setCantidad] = useState(10);
 
+  const selectStyle = {
+    bg: "white",
+    color: "gray.800",
+    borderColor: "gray.300",
+    _hover: { borderColor: "gray.400" },
+    _focus: { borderColor: "gray.500", boxShadow: "0 0 0 1px var(--chakra-colors-gray-500)" },
+    _disabled: { bg: "gray.100", color: "gray.500" },
+    sx: {
+      option: { bg: "white", color: "gray.800" },
+      "> option": { bg: "white", color: "gray.800" },
+    },
+  } as const;
+
   return (
     <VStack align="stretch" spacing={4}>
       <HStack>
         <FormControl>
           <FormLabel>Tipo</FormLabel>
-          <Select value={tipo} onChange={e => setTipo(e.target.value as Tipo)} isDisabled={isDisabled}>
+          <Select
+            value={tipo}
+            onChange={e => setTipo(e.target.value as Tipo)}
+            isDisabled={isDisabled}
+            {...selectStyle}
+          >
             {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
           </Select>
         </FormControl>
         <FormControl>
           <FormLabel>Calidad</FormLabel>
-          <Select value={calidad} onChange={e => setCalidad(e.target.value as Calidad)} isDisabled={isDisabled}>
+          <Select
+            value={calidad}
+            onChange={e => setCalidad(e.target.value as Calidad)}
+            isDisabled={isDisabled}
+            {...selectStyle}
+          >
             {CALIDADES.map(c => <option key={c} value={c}>{c}</option>)}
           </Select>
         </FormControl>
@@ -32,13 +55,24 @@ export function MateriaPrimaForm({ onSave, isDisabled }: {
       <HStack>
         <FormControl>
           <FormLabel>Humedad (%)</FormLabel>
-          <NumberInput min={0} max={100} value={humedadPorc} onChange={(_, v) => setHumedad(v)} isDisabled={isDisabled}>
+          <NumberInput
+            min={0}
+            max={100}
+            value={humedadPorc}
+            onChange={(_, v) => setHumedad(v)}
+            isDisabled={isDisabled}
+          >
             <NumberInputField />
           </NumberInput>
         </FormControl>
         <FormControl>
           <FormLabel>Cantidad</FormLabel>
-          <NumberInput min={1} value={cantidad} onChange={(_, v) => setCantidad(v)} isDisabled={isDisabled}>
+          <NumberInput
+            min={1}
+            value={cantidad}
+            onChange={(_, v) => setCantidad(v)}
+            isDisabled={isDisabled}
+          >
             <NumberInputField />
           </NumberInput>
         </FormControl>
@@ -47,5 +81,5 @@ export function MateriaPrimaForm({ onSave, isDisabled }: {
         Guardar materia prima
       </Button>
     </VStack>
-  )
+  );
 }

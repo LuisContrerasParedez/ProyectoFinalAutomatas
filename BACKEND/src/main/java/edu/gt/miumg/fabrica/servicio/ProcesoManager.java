@@ -1,8 +1,6 @@
 package edu.gt.miumg.fabrica.servicio;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -11,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import edu.gt.miumg.fabrica.Estado;
 import edu.gt.miumg.fabrica.MateriaPrima;
+import edu.gt.miumg.fabrica.ProcesoProduccion;
+import edu.gt.miumg.fabrica.estados.EstadoFactory;
 import edu.gt.miumg.fabrica.persistencia.Proceso;
 import edu.gt.miumg.fabrica.persistencia.ProcesoEvent;
 import edu.gt.miumg.fabrica.persistencia.ProcesoEventRepo;
@@ -27,26 +27,13 @@ public class ProcesoManager {
         this.eventRepo = eventRepo;
     }
 
-    private static final Map<Estado, Set<Estado>> TRANSICIONES = Map.of(
-        Estado.RECEPCION_MP,       Set.of(Estado.INSPECCION_CALIDAD),
-        Estado.INSPECCION_CALIDAD, Set.of(Estado.CORTE_DIMENSIONADO, Estado.RECHAZADA),
-        Estado.CORTE_DIMENSIONADO, Set.of(Estado.SECADO_TRATAMIENTO),
-        Estado.SECADO_TRATAMIENTO, Set.of(Estado.ALMACENADO),
-        Estado.ALMACENADO,         Set.of(Estado.DISTRIBUIDO_PRODUCCION)
-    );
-
-    private static void validarTransicion(Estado origen, Estado destino) {
-        var destinos = TRANSICIONES.getOrDefault(origen, Set.of());
-        if (!destinos.contains(destino)) {
-            throw new IllegalStateException("Transición inválida: " + origen + " -> " + destino);
-        }
-    }
-
     private static <E extends Enum<E>> E parseEnum(Class<E> type, String value) {
         if (value == null) return null;
         try { return Enum.valueOf(type, value); }
         catch (IllegalArgumentException ex) { return null; }
     }
+
+    // ----------------- CRUD / Lecturas -----------------
 
     @Transactional
     public String crearProceso() {
@@ -57,7 +44,7 @@ public class ProcesoManager {
 
         ProcesoEvent ev = new ProcesoEvent();
         ev.setProcesoId(p.getId());
-        ev.setEstadoOrigen("-"); // evita NOT NULL
+        ev.setEstadoOrigen("-"); // primer evento sin origen
         ev.setEstadoDestino(Estado.RECEPCION_MP.name());
         eventRepo.save(ev);
 
@@ -76,9 +63,9 @@ public class ProcesoManager {
     }
 
     @Transactional(readOnly = true)
-    public edu.gt.miumg.fabrica.ProcesoProduccion getProceso(String id) {
+    public ProcesoProduccion getProceso(String id) {
         Proceso e = getProcesoEntity(id);
-        var p = new edu.gt.miumg.fabrica.ProcesoProduccion();
+        var p = new ProcesoProduccion();
 
         p.setEstadoActual(parseEnum(Estado.class, e.getEstadoActual()));
         p.setTerminal(e.isTerminal());
@@ -92,6 +79,8 @@ public class ProcesoManager {
         }
         return p;
     }
+
+    // ----------------- Comandos de dominio -----------------
 
     @Transactional
     public void setMateriaPrima(String id, MateriaPrima mp) {
@@ -114,15 +103,21 @@ public class ProcesoManager {
     @Transactional
     public void decidirCalidad(String id, boolean apta) {
         Proceso e = getProcesoEntity(id);
-        Estado origen = parseEnum(Estado.class, e.getEstadoActual());
+
+        // Construir el agregado de dominio
+        var p = getProceso(id);
+        Estado origen = p.getEstadoActual();
         if (origen != Estado.INSPECCION_CALIDAD) {
             throw new IllegalStateException("Solo se puede decidir en INSPECCION_CALIDAD (actual: " + origen + ")");
         }
-        Estado destino = apta ? Estado.CORTE_DIMENSIONADO : Estado.RECHAZADA;
-        validarTransicion(origen, destino);
 
+        // Delegar al estado
+        p.decidir(apta);
+        Estado destino = p.getEstadoActual();
+
+        // Persistir
         e.setEstadoActual(destino.name());
-        e.setTerminal(destino == Estado.RECHAZADA);
+        e.setTerminal(destino == Estado.RECHAZADA || destino == Estado.DISTRIBUIDO_PRODUCCION);
         repo.save(e);
 
         ProcesoEvent ev = new ProcesoEvent();
@@ -135,22 +130,16 @@ public class ProcesoManager {
     @Transactional
     public void avanzar(String id) {
         Proceso e = getProcesoEntity(id);
-        Estado origen = parseEnum(Estado.class, e.getEstadoActual());
-        Estado destino;
 
-        switch (origen) {
-            case RECEPCION_MP -> destino = Estado.INSPECCION_CALIDAD;
-            case CORTE_DIMENSIONADO -> destino = Estado.SECADO_TRATAMIENTO;
-            case SECADO_TRATAMIENTO -> destino = Estado.ALMACENADO;
-            case ALMACENADO -> destino = Estado.DISTRIBUIDO_PRODUCCION;
-            case INSPECCION_CALIDAD ->
-                throw new IllegalStateException("Desde INSPECCION_CALIDAD usa decidirCalidad(true|false).");
-            default -> throw new IllegalStateException("No se puede avanzar desde estado: " + origen);
-        }
+        var p = getProceso(id);
+        Estado origen = p.getEstadoActual();
 
-        validarTransicion(origen, destino);
+        // Delegar al estado (el propio estado valida si puede avanzar)
+        p.avanzar();
+        Estado destino = p.getEstadoActual();
+
         e.setEstadoActual(destino.name());
-        e.setTerminal(destino == Estado.DISTRIBUIDO_PRODUCCION);
+        e.setTerminal(destino == Estado.DISTRIBUIDO_PRODUCCION || destino == Estado.RECHAZADA);
         repo.save(e);
 
         ProcesoEvent ev = new ProcesoEvent();
@@ -177,6 +166,40 @@ public class ProcesoManager {
         ev.setEstadoDestino(Estado.RECEPCION_MP.name());
         eventRepo.save(ev);
     }
+
+    // Opcional requerido: REPROCESO (desde INSPECCION_CALIDAD -> REPROCESO)
+    @Transactional
+    public void reprocesar(String id) {
+        Proceso e = getProcesoEntity(id);
+        var p = getProceso(id);
+        Estado origen = p.getEstadoActual();
+
+        if (origen != Estado.INSPECCION_CALIDAD) {
+            throw new IllegalStateException("Solo se puede reprocesar desde INSPECCION_CALIDAD (actual: " + origen + ")");
+        }
+
+        // Usamos la implementación concreta de estado:
+        // EstadoFactory.of(origen) debe ser InspeccionCalidad y exponer reprocesar(...)
+        var op = EstadoFactory.of(origen);
+        if (op instanceof edu.gt.miumg.fabrica.estados.InspeccionCalidad ic) {
+            ic.reprocesar(p); // -> REPROCESO
+        } else {
+            throw new IllegalStateException("Estado actual no soporta reproceso: " + origen);
+        }
+
+        Estado destino = p.getEstadoActual();
+        e.setEstadoActual(destino.name());
+        e.setTerminal(false);
+        repo.save(e);
+
+        ProcesoEvent ev = new ProcesoEvent();
+        ev.setProcesoId(UUID.fromString(id));
+        ev.setEstadoOrigen(origen.name());
+        ev.setEstadoDestino(destino.name());
+        eventRepo.save(ev);
+    }
+
+    // ----------------- Lecturas auxiliares -----------------
 
     @Transactional(readOnly = true)
     public List<String> historial(String id) {

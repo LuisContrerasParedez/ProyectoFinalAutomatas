@@ -94,4 +94,8 @@ export const procesosApi = {
   reiniciar: async (id: string): Promise<void> => {
     await api.post(`/procesos/${id}/reiniciar`);
   },
+  
+  reproceso: async (id: string): Promise<void> => {
+    await api.post(`/procesos/${id}/reproceso`);
+  },
 };
